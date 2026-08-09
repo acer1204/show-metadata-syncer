@@ -59,3 +59,40 @@ async def preview(
                     if min_score is None or it.get("score", 0) >= min_score)
     hits.sort(key=lambda h: h.score, reverse=True)
     return hits
+
+
+# ─── v1.1 向下相容：POST /api/search ──────────────────────────────────
+# 舊版 UI 與既有 client 走這個端點；內部直接轉呼叫 preview。
+legacy_router = APIRouter(prefix="/api", tags=["compat"])
+
+
+class LegacySearchRequest(BaseModel):
+    name: str
+    lang: str = "zho"
+
+
+class LegacySearchResult(BaseModel):
+    id: str
+    name: str
+    year: str = ""
+    overview: str = ""
+
+
+class LegacySearchResponse(BaseModel):
+    results: list[LegacySearchResult]
+
+
+@legacy_router.post("/search", operation_id="search_series_legacy",
+                    response_model=LegacySearchResponse,
+                    summary="(compat) v1.1 搜尋端點，等同 GET /api/preview")
+async def legacy_search(req: LegacySearchRequest):
+    hits = await preview(q=req.name, source="all", min_score=None)
+    return LegacySearchResponse(results=[
+        LegacySearchResult(
+            id=h.id,
+            name=h.title_cn or h.title_native or h.title_english or "",
+            year=h.year or "",
+            overview=(h.overview or "")[:100],
+        )
+        for h in hits
+    ])

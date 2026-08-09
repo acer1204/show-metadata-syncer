@@ -1,21 +1,37 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
 .venv/
 venv/
-env/
+*.egg-info/
 
-# IDE
+# Node / frontend build
+node_modules/
+dist/
+build/
+.vite/
+
+# Runtime data (settings.json holds the user-supplied TMDB API key)
+data/
+output/
+*.db
+*.sqlite
+
+# Local env overrides
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
 .vscode/
-.claude/
+.idea/
 *.swp
 *.swo
-
-# Project
-output/
-*.pen
-
-# OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+logs/
+

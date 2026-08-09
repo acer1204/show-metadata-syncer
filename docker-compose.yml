@@ -1,20 +1,22 @@
+name: show-metadata-syncer        # docker compose project name → stack/network use this prefix
+
 services:
-  tvdb-crawler:
+  syncer:
     build: .
-    image: tvdb-nfo-crawler:latest
-    container_name: tvdb-nfo-crawler
+    image: show-metadata-syncer:latest
+    container_name: show-metadata-syncer
     restart: unless-stopped
     ports:
       - "7711:7711"
-    environment:
-      HOST: 0.0.0.0
-      PORT: "7711"
-      TZ: Asia/Taipei
     volumes:
-      - ./output:/app/output
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7711/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      - ./output:/app/output   # NFO + 圖片輸出
+      - ./data:/app/data       # persists runtime settings written via /api/settings
+    environment:
+      # These env vars seed the initial defaults. Anything saved through the
+      # UI later overrides them and persists across container restarts.
+      SEARCH_LANG: zho
+      LANG_PRIORITY: "zhtw,zho,jpn,eng"
+      EPISODE_DELAY: "0.5"
+      FUZZ_THRESHOLD: "75"
+      CORS_ORIGINS: "*"
+      TZ: Asia/Taipei

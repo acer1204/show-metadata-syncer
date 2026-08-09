@@ -1,8 +1,11 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
+pydantic>=2.7
+pydantic-settings>=2.4
 fastapi-mcp==0.4.0
 mcp<2
 requests>=2.31
 beautifulsoup4>=4.12
 lxml>=5.0
 html5lib>=1.1
+rapidfuzz>=3.9

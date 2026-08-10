@@ -171,6 +171,15 @@ export default function Tasks() {
                   <span className={`badge ${detail.status}`} style={{ marginLeft: 8 }}>{detail.status}</span>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
+                  {detail.status === "done" && (
+                    <a href={`/api/tasks/${detail.id}/zip`}
+                       style={{
+                         fontSize: 13, padding: "5px 10px", background: "#238636",
+                         color: "white", borderRadius: 6, textDecoration: "none",
+                       }}>
+                      ⬇️ 下載 ZIP
+                    </a>
+                  )}
                   <button onClick={regenerate} disabled={detail.status !== "done"}
                           style={{ fontSize: 13, padding: "5px 10px" }}>
                     重產 NFO

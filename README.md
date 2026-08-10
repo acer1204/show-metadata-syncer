@@ -82,6 +82,7 @@ tvdb_crawler.bat web                # 啟動 web 服務
 | GET | `/api/status/{task_id}` | 任務狀態 + log |
 | GET/DELETE | `/api/tasks` `/api/tasks/{id}` | 任務清單 / 刪除 |
 | GET | `/api/tasks/{id}/files` `/api/tasks/{id}/file?path=` | 輸出檔案清單 / 下載 |
+| GET | `/api/tasks/{id}/zip` | 整個輸出資料夾打包 ZIP 下載（解壓即 Emby 影集資料夾） |
 | POST | `/api/tasks/{id}/regenerate` | 用快取重產 NFO（不連網） |
 | POST | `/api/artwork/*` | 單獨下載系列 / 季 / 集圖片 |
 | GET/PUT | `/api/settings` | 語言優先序等執行期設定 |

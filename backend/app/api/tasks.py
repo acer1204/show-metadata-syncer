@@ -4,15 +4,19 @@ POST /api/crawl 啟動背景任務（抓整個系列 → 下載圖 → 產 NFO �
 其餘端點查狀態、列檔案、下載檔案、重產 NFO。
 """
 import mimetypes
+import os
 import shutil
+import tempfile
 import threading
 import time
+import zipfile
 from pathlib import Path
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from starlette.background import BackgroundTask
 
 from ..config import settings, lang_priority_list
 from ..clients.tvdb import (
@@ -166,6 +170,38 @@ def download_task_file(task_id: str, path: str = Query(..., description="任務�
     mime, _ = mimetypes.guess_type(target.name)
     return FileResponse(str(target), media_type=mime or "application/octet-stream",
                         filename=target.name)
+
+
+@router.get("/tasks/{task_id}/zip", operation_id="download_task_zip")
+def download_task_zip(task_id: str):
+    """把任務的整個輸出資料夾（NFO + 圖片）打包成 ZIP 下載。
+
+    ZIP 內是一層 {系列名}/ 資料夾，解壓即為 Emby 影集資料夾。
+    """
+    with TASK_LOCK:
+        task = TASKS.get(task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+    out = task.get("output", "")
+    if not out:
+        raise HTTPException(400, "Task 尚未完成")
+    root = Path(out)
+    if not root.exists():
+        raise HTTPException(404, "Output dir 不存在")
+
+    # 先壓到暫存檔再串流（輸出目錄可能上百 MB，不放記憶體），回應後自動刪除
+    tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    tmp.close()
+    with zipfile.ZipFile(tmp.name, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in sorted(root.rglob("*")):
+            if p.is_file():
+                z.write(p, arcname=f"{root.name}/{p.relative_to(root).as_posix()}")
+    return FileResponse(
+        tmp.name,
+        media_type="application/zip",
+        filename=f"{root.name}.zip",
+        background=BackgroundTask(os.unlink, tmp.name),
+    )
 
 
 @router.post("/tasks/{task_id}/regenerate", operation_id="regenerate_task_nfo")

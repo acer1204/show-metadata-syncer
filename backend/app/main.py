@@ -35,7 +35,6 @@ app.add_middleware(
 
 app.include_router(sources_api.router)
 app.include_router(preview.router)
-app.include_router(preview.legacy_router)
 app.include_router(metadata_api.router)
 app.include_router(nfo.router)
 app.include_router(tasks.router)

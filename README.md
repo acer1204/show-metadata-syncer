@@ -78,7 +78,7 @@ tvdb_crawler.bat web                # 啟動 web 服務
 | GET | `/api/metadata?q=&source=all&episodes=none` | 各來源 top-3 候選的完整 canonical JSON，依 fuzzy 分數排名 |
 | GET | `/api/metadata/{source}/{id}?episodes=list` | 單筆完整 canonical JSON（給 Emby-like client 用） |
 | POST | `/api/nfo/tvshow` `/api/nfo/season` `/api/nfo/episode` | 回傳 Emby NFO XML 字串（不寫檔） |
-| POST | `/api/crawl` | 背景任務：抓整系列 + 下載圖 + 產 NFO 到 output/ |
+| POST | `/api/crawl` | 背景任務：抓整系列 + 下載圖 + 產 NFO 到 output/（body 帶 `source`，tvdb / tmdb 皆支援） |
 | GET | `/api/status/{task_id}` | 任務狀態 + log |
 | GET/DELETE | `/api/tasks` `/api/tasks/{id}` | 任務清單 / 刪除 |
 | GET | `/api/tasks/{id}/files` `/api/tasks/{id}/file?path=` | 輸出檔案清單 / 下載 |

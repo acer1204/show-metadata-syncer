@@ -24,15 +24,16 @@ from ..clients.tvdb import (
     generate_tvshow_nfo, generate_season_nfo, generate_episode_nfo,
     make_xml_declaration,
 )
-from ..crawl import TASKS, TASK_LOCK, run_crawl, output_base
+from ..crawl import TASKS, TASK_LOCK, run_crawl, run_crawl_canonical, output_base
+from ..sources import get_source, source_names, is_enabled
 from ..sources.tvdb import get_series, get_season, find_episode
 
 router = APIRouter(prefix="/api", tags=["tasks"])
 
 
 class CrawlRequest(BaseModel):
-    id: str = Field(..., description="TheTVDB 系列數字 ID")
-    source: str = Field("tvdb", description="來源（目前僅支援 tvdb）")
+    id: str = Field(..., description="來源的系列 ID（TVDB 或 TMDB 的數字 ID）")
+    source: str = Field("tvdb", description="來源（tvdb / tmdb / ...）")
     lang: Optional[str] = None
     lang_priority: Optional[List[str]] = None
 
@@ -70,20 +71,30 @@ class ArtworkDownloadRequest(BaseModel):
     rel_path: str = Field(..., description="輸出目錄下的相對路徑")
 
 
-@router.post("/crawl", operation_id="start_tvdb_crawl", response_model=CrawlResponse)
+@router.post("/crawl", operation_id="start_nfo_crawl", response_model=CrawlResponse)
 def api_crawl(req: CrawlRequest):
-    """啟動非同步爬蟲：抓系列+季+集 metadata、下載所有圖、產 NFO。回傳 task_id。"""
-    if req.source != "tvdb":
-        raise HTTPException(400, "目前只有 tvdb 支援 NFO 爬蟲任務")
+    """啟動非同步 NFO 任務：抓系列+季+集 metadata、下載所有圖、產 NFO。回傳 task_id。
+
+    tvdb 走網頁爬蟲；其他來源（tmdb 等）走 canonical 通用流程。
+    """
+    source = (req.source or "tvdb").lower()
+    if get_source(source) is None:
+        raise HTTPException(400, f"unknown source: {source!r} (expected: {', '.join(source_names())})")
+    if not is_enabled(source):
+        raise HTTPException(400, f"來源 {source} 已停用（設定頁可重新啟用）")
     sid = req.id.strip()
     if not sid:
         raise HTTPException(400, "請提供 Series ID")
-    task_id = f"{int(time.time())}-{sid}"
+    task_id = f"{int(time.time())}-{source}-{sid}"
     with TASK_LOCK:
         TASKS[task_id] = {"id": task_id, "status": "pending", "logs": [], "output": "", "title": ""}
     lang = req.lang or settings.search_lang
     priority = req.lang_priority or lang_priority_list()
-    threading.Thread(target=run_crawl, args=(task_id, sid, lang, priority), daemon=True).start()
+    if source == "tvdb":
+        threading.Thread(target=run_crawl, args=(task_id, sid, lang, priority), daemon=True).start()
+    else:
+        threading.Thread(target=run_crawl_canonical,
+                         args=(task_id, source, sid, lang, priority), daemon=True).start()
     return CrawlResponse(task_id=task_id)
 
 

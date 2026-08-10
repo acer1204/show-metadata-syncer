@@ -12,6 +12,7 @@ from .clients.tvdb import (
     scrape_season_images, get_episode_image_url,
 )
 from .sources.tvdb import get_slug
+from .nfo_canonical import canonical_to_legacy
 
 TASKS: Dict[str, Dict[str, Any]] = {}
 TASK_LOCK = threading.Lock()
@@ -19,6 +20,111 @@ TASK_LOCK = threading.Lock()
 
 def output_base() -> Path:
     return Path(settings.output_dir)
+
+
+def run_crawl_canonical(task_id, source_name, item_id, lang, lang_priority=None):
+    """通用 NFO 任務：任何回傳 canonical schema 的來源（TMDB 等）都適用。
+
+    來源的 full(episodes='full') 拿完整資料 → 轉成 legacy 形狀 →
+    重用既有 NFO 產生器 + 圖片下載，輸出結構與 TVDB 任務相同。
+    """
+    from .sources import get_source
+
+    if lang_priority is None:
+        lang_priority = lang_priority_list()
+    try:
+        with TASK_LOCK:
+            TASKS[task_id]["status"] = "running"
+
+        def log(msg):
+            with TASK_LOCK:
+                TASKS[task_id]["logs"].append(msg)
+
+        mod = get_source(source_name)
+        log(f"從 {source_name} 取得完整 metadata（含每集）...")
+        detail = mod.full(item_id, "full", lang_priority)
+        if not detail.get("id"):
+            raise RuntimeError(f"{source_name}: {item_id} 查無資料")
+
+        series_data, seasons, episodes_by_season, actors = canonical_to_legacy(detail, source_name)
+        title = detail.get("title") or series_data["title"] or item_id
+        total_eps = sum(len(v) for v in episodes_by_season.values())
+        log(f"  標題: {title}    季數: {len(seasons)}    集數: {total_eps}    演員: {len(actors)} 位")
+
+        safe_title = "".join(c for c in title if c not in r'\/:*?"<>|')
+        output_dir = output_base() / task_id / safe_title
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        images = series_data.get("images", {})
+        log("下載系列圖片 ...")
+        if images.get("poster") and download_image(images["poster"], output_dir / "poster.jpg"):
+            series_data["poster_path"] = "poster.jpg"
+        if images.get("fanart") and download_image(images["fanart"], output_dir / "fanart.jpg"):
+            series_data["fanart_path"] = "fanart.jpg"
+        if images.get("clearlogo"):
+            ext = ".png" if images["clearlogo"].lower().endswith(".png") else ".jpg"
+            if download_image(images["clearlogo"], output_dir / f"clearlogo{ext}"):
+                series_data["clearlogo_path"] = f"clearlogo{ext}"
+        if images.get("banner") and download_image(images["banner"], output_dir / "banner.jpg"):
+            series_data["banner_path"] = "banner.jpg"
+
+        for s_info in seasons:
+            sn = s_info["number"]
+            poster_url = s_info.get("_poster_url", "")
+            poster_name = f"season{sn:02d}-poster.jpg" if sn > 0 else "season-specials-poster.jpg"
+            if poster_url:
+                download_image(poster_url, output_dir / poster_name)
+            time.sleep(0.2)
+
+        log("下載每集縮圖 ...")
+        for s_info in seasons:
+            sn = s_info["number"]
+            eps = episodes_by_season.get(sn, [])
+            if not eps:
+                continue
+            season_dir = output_dir / ("Specials" if sn == 0 else f"Season {sn:02d}")
+            season_dir.mkdir(parents=True, exist_ok=True)
+            for ep in eps:
+                thumb_url = ep.get("_thumb_url", "")
+                if not thumb_url:
+                    continue
+                thumb_name = f"S{ep.get('seasonNumber', sn):02d}E{ep.get('number', 0):02d}-thumb.jpg"
+                if download_image(thumb_url, season_dir / thumb_name):
+                    ep["thumb_local"] = thumb_name
+                time.sleep(0.1)
+
+        log("產生 tvshow.nfo ...")
+        tvshow_root = generate_tvshow_nfo(series_data, seasons, episodes_by_season, actors, lang, lang_priority)
+        (output_dir / "tvshow.nfo").write_text(make_xml_declaration(tvshow_root), encoding="utf-8")
+
+        for s_info in seasons:
+            sn = s_info["number"]
+            eps = episodes_by_season.get(sn, [])
+            if not eps:
+                continue
+            season_dir = output_dir / ("Specials" if sn == 0 else f"Season {sn:02d}")
+            season_dir.mkdir(parents=True, exist_ok=True)
+            (season_dir / "season.nfo").write_text(
+                make_xml_declaration(generate_season_nfo(s_info, eps, lang_priority)), encoding="utf-8")
+            for ep in sorted(eps, key=lambda e: int(e.get("number", 0))):
+                ep_filename = f"S{ep.get('seasonNumber', sn):02d}E{ep.get('number', 0):02d}.nfo"
+                (season_dir / ep_filename).write_text(
+                    make_xml_declaration(generate_episode_nfo(ep, series_data, lang_priority)), encoding="utf-8")
+
+        log(f"==== 完成！NFO 輸出到: {output_dir.resolve()} ====")
+
+        with TASK_LOCK:
+            TASKS[task_id]["status"] = "done"
+            TASKS[task_id]["output"] = str(output_dir.resolve())
+            TASKS[task_id]["title"] = title
+            TASKS[task_id]["_series_data"] = series_data
+            TASKS[task_id]["_episodes_by_season"] = episodes_by_season
+            TASKS[task_id]["_lang"] = lang
+            TASKS[task_id]["_lang_priority"] = lang_priority
+    except Exception as e:
+        with TASK_LOCK:
+            TASKS[task_id]["status"] = "error"
+            TASKS[task_id]["logs"].append(f"錯誤: {e}")
 
 
 def run_crawl(task_id, series_id, lang, lang_priority=None):

@@ -164,7 +164,8 @@ export const Api = {
   metadataById: (source: string, id: string, episodes: EpisodesMode = "list") =>
     api.get<SourceDetail>(`/metadata/${source}/${id}`, { params: { episodes } }).then(r => r.data),
 
-  crawl: (id: string) => api.post<{ task_id: string }>("/crawl", { id }).then(r => r.data),
+  crawl: (id: string, source = "tvdb") =>
+    api.post<{ task_id: string }>("/crawl", { id, source }).then(r => r.data),
   tasks: () => api.get<TaskSummary[]>("/tasks").then(r => r.data),
   taskStatus: (id: string) => api.get<TaskStatus>(`/status/${id}`).then(r => r.data),
   taskFiles: (id: string) => api.get<FileEntry[]>(`/tasks/${id}/files`).then(r => r.data),

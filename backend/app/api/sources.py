@@ -9,8 +9,8 @@ from ..sources import SOURCES, is_enabled
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 
-# 支援 NFO 爬蟲任務（/api/crawl）的來源
-_NFO_CRAWL = {"tvdb"}
+# 支援 NFO 任務（/api/crawl）的來源：tvdb 走爬蟲、其餘走 canonical 通用流程
+_NFO_CRAWL = {"tvdb", "tmdb"}
 
 
 class SourceStatus(BaseModel):

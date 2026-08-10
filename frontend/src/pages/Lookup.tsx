@@ -111,7 +111,7 @@ function SourceCard({ d }: { d: SourceDetail }) {
   async function startCrawl() {
     setCrawlMsg("啟動中…");
     try {
-      const { task_id } = await Api.crawl(d.id);
+      const { task_id } = await Api.crawl(d.id, d.source);
       window.location.hash = `#tasks/${task_id}`;
     } catch (e: any) {
       setCrawlMsg("❌ " + (e?.response?.data?.detail ?? e.message));

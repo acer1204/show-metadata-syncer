@@ -52,13 +52,23 @@ def health():
     return {"status": "ok"}
 
 
-# ─── MCP server — 自動把所有有 operation_id 的端點變成 MCP tools ──────
+# ─── MCP server（Streamable HTTP, /mcp）───────────────────────────────
+# 與 comic / jav-metadata-syncer 共用同一組核心 tool 名稱，agent 可一套邏輯接三服務
+MCP_TOOLS = [
+    "list_sources", "preview_search", "metadata_search", "metadata_by_id",
+    "get_settings", "update_settings",
+    # show 專屬：NFO 任務與 XML 產生（回傳二進位的 zip / 檔案下載不暴露為 tool）
+    "start_nfo_crawl", "get_crawl_status", "list_tasks", "list_task_files",
+    "regenerate_task_nfo",
+    "generate_tvshow_nfo_api", "generate_season_nfo_api", "generate_episode_nfo_api",
+]
 try:
     from fastapi_mcp import FastApiMCP
     mcp = FastApiMCP(
         app,
         name="Show Metadata Syncer",
-        description="TheTVDB 抓取/查詢/NFO 生成/任務管理 API（Emby 相容）。",
+        description="電視節目/電影 metadata 查詢（TheTVDB / TMDB），統一 canonical JSON + Emby NFO 任務。",
+        include_operations=MCP_TOOLS,
     )
     mcp.mount_http()  # Streamable HTTP transport at /mcp
 except Exception as e:  # fastapi-mcp 未安裝或版本 mismatch 時降級為純 REST

@@ -86,7 +86,7 @@ tvdb_crawler.bat web                # 啟動 web 服務
 | POST | `/api/tasks/{id}/regenerate` | 用快取重產 NFO（不連網） |
 | POST | `/api/artwork/*` | 單獨下載系列 / 季 / 集圖片 |
 | GET/PUT | `/api/settings` | 語言優先序等執行期設定 |
-| — | `/mcp` | 以上端點自動暴露為 MCP tools |
+| — | `/mcp` | MCP server（Streamable HTTP），見下方「MCP server」一節 |
 
 ### Emby-like client 的典型流程
 
@@ -153,3 +153,15 @@ output/{task_id}/{系列名}/
     ├── season.nfo
     ├── S00E01.nfo  S00E01-thumb.jpg  ...
 ```
+
+## MCP server（Streamable HTTP）
+
+本服務同時是一個 **MCP server**，掛在 `http://localhost:7711/mcp`（Streamable HTTP transport），可直接接入任何支援 MCP 的 agent。
+
+三個 metadata-syncer 共用同一組**核心 tools**，agent 用一套邏輯就能接三個服務：
+
+```
+list_sources / preview_search / metadata_search / metadata_by_id / get_settings / update_settings
+```
+
+本服務額外提供：`start_nfo_crawl`、`get_crawl_status`、`list_tasks`、`list_task_files`、`regenerate_task_nfo`、`generate_tvshow_nfo_api`、`generate_season_nfo_api`、`generate_episode_nfo_api`（回傳二進位的 ZIP / 檔案下載端點不暴露為 tool）。
